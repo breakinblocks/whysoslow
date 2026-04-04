@@ -12,11 +12,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Times every individual placed feature execution during worldgen.
- * Attributes each feature to its mod by looking up the PlacedFeature
- * instance in the registry identity map.
- */
 @Mixin(PlacedFeature.class)
 public abstract class MixinPlacedFeature {
 

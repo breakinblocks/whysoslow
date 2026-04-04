@@ -26,10 +26,8 @@ public class WhySoSlow {
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
-        // Write startup report once all mods are done loading
         modEventBus.addListener(this::onLoadComplete);
 
-        // Register server/common event handlers
         MinecraftForge.EVENT_BUS.register(WhySoSlowEventHandler.class);
         MinecraftForge.EVENT_BUS.register(WhySoSlowCommand.class);
     }

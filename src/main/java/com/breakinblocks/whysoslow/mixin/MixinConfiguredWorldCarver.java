@@ -19,10 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.function.Function;
 
-/**
- * Times world carver execution (caves, ravines, etc.) and
- * attributes each carver to its mod via registry lookup.
- */
 @Mixin(ConfiguredWorldCarver.class)
 public abstract class MixinConfiguredWorldCarver {
 

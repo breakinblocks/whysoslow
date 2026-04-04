@@ -11,11 +11,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Times the entire biome decoration pass (applyBiomeDecoration) per chunk.
- * This covers all feature placement within a single chunk. Individual features
- * are timed separately by MixinPlacedFeature.
- */
 @Mixin(ChunkGenerator.class)
 public abstract class MixinChunkGenerator {
 

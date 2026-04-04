@@ -17,10 +17,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
-/**
- * Times noise-based terrain generation (fillFromNoise) and
- * surface building (buildSurface) in the noise chunk generator.
- */
 @Mixin(NoiseBasedChunkGenerator.class)
 public abstract class MixinNoiseBasedChunkGenerator {
 
@@ -29,8 +25,6 @@ public abstract class MixinNoiseBasedChunkGenerator {
 
     @Unique
     private static final ThreadLocal<Long> whysoslow$surfaceStartTime = new ThreadLocal<>();
-
-    // --- fillFromNoise timing ---
 
     @Inject(method = "fillFromNoise", at = @At("HEAD"))
     private void whysoslow$onFillNoiseStart(Executor executor, Blender blender,
@@ -58,8 +52,6 @@ public abstract class MixinNoiseBasedChunkGenerator {
             }
         }
     }
-
-    // --- buildSurface timing ---
 
     @Inject(method = "buildSurface", at = @At("HEAD"))
     private void whysoslow$onBuildSurfaceStart(WorldGenRegion level,

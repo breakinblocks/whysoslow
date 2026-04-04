@@ -8,10 +8,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Hooks into MinecraftServer.createLevels to measure the time spent
- * creating and initializing all world dimensions.
- */
 @Mixin(MinecraftServer.class)
 public abstract class MixinMinecraftServer {
 

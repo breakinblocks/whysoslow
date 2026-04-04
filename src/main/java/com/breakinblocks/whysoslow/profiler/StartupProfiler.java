@@ -25,7 +25,6 @@ public class StartupProfiler {
 
     private static final ConcurrentHashMap<String, ModStartupData> modData = new ConcurrentHashMap<>();
 
-    // Thread-local for tracking per-event start times
     private static final ThreadLocal<Long> wallStart = new ThreadLocal<>();
     private static final ThreadLocal<Long> cpuStart = new ThreadLocal<>();
     private static final ThreadLocal<Long> memStart = new ThreadLocal<>();
@@ -144,7 +143,6 @@ public class StartupProfiler {
         return className;
     }
 
-    // Per-mod accumulated data
     public static class ModStartupData {
         private final String modId;
         private final ConcurrentHashMap<String, PhaseData> phases = new ConcurrentHashMap<>();

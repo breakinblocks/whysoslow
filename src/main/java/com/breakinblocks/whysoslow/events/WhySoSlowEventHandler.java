@@ -35,7 +35,6 @@ public class WhySoSlowEventHandler {
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
-        // If worldgen profiling is still active when server stops, write the report
         if (com.breakinblocks.whysoslow.profiler.WorldGenProfiler.isActive()) {
             com.breakinblocks.whysoslow.profiler.WorldGenProfiler.stop();
             ReportWriter.writeWorldGenReport(FMLPaths.GAMEDIR.get());

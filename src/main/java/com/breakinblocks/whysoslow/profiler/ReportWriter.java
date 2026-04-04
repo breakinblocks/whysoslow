@@ -19,8 +19,6 @@ public class ReportWriter {
     private static final String THIN_SEP = "-".repeat(90);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // ========== STARTUP REPORT ==========
-
     public static void writeStartupReport(Path gameDir) {
         Path reportFile = gameDir.resolve("logs/whysoslow/startup.log");
         try {
@@ -33,12 +31,10 @@ public class ReportWriter {
         Map<String, StartupProfiler.ModStartupData> data = StartupProfiler.getModData();
         Map<String, Map<String, Integer>> registryCounts = StartupProfiler.countRegistryEntries();
 
-        // Sort mods by total wall time, descending
         List<StartupProfiler.ModStartupData> sorted = data.values().stream()
                 .sorted(Comparator.comparingLong(StartupProfiler.ModStartupData::getTotalWallNanos).reversed())
                 .toList();
 
-        // Calculate phase totals
         Map<String, Long> phaseTotals = new LinkedHashMap<>();
         for (StartupProfiler.ModStartupData mod : sorted) {
             for (Map.Entry<String, StartupProfiler.PhaseData> entry : mod.getPhases().entrySet()) {
@@ -60,7 +56,6 @@ public class ReportWriter {
             w.printf("  Total mods profiled:           %d%n", StartupProfiler.getModCount());
             w.println(SEPARATOR);
 
-            // Phase breakdown
             w.println();
             w.println("PHASE BREAKDOWN:");
             w.println(THIN_SEP);
@@ -71,7 +66,6 @@ public class ReportWriter {
                 w.printf("  %-30s %s%n", entry.getKey() + ":", formatNanos(entry.getValue()));
             }
 
-            // Top mods
             w.println();
             w.println("ALL MODS (slowest to fastest by total wall time):");
             w.println(SEPARATOR);
@@ -87,7 +81,6 @@ public class ReportWriter {
                 w.printf("#%-3d  %s  -  %s total  |  CPU: %s  |  Mem: %s%n",
                         rank, mod.getModId(), formatNanos(totalWall), formatNanos(totalCpu), formatBytes(totalMem));
 
-                // Per-phase breakdown
                 List<Map.Entry<String, StartupProfiler.PhaseData>> phases = mod.getPhases().entrySet().stream()
                         .sorted(Comparator.comparingLong((Map.Entry<String, StartupProfiler.PhaseData> e) ->
                                 e.getValue().wallNanos.get()).reversed())
@@ -104,7 +97,6 @@ public class ReportWriter {
                             formatBytes(pd.memDelta.get()));
                 }
 
-                // Registry entries for this mod
                 Map<String, Integer> regCounts = registryCounts.get(mod.getModId());
                 if (regCounts != null && !regCounts.isEmpty()) {
                     w.print("    Registered: ");
@@ -126,8 +118,6 @@ public class ReportWriter {
 
         LOGGER.info("Startup report written to {}", reportFile);
     }
-
-    // ========== WORLD LOAD REPORT ==========
 
     public static void writeWorldLoadReport(Path gameDir) {
         Path reportFile = gameDir.resolve("logs/whysoslow/worldload.log");
@@ -155,7 +145,6 @@ public class ReportWriter {
             w.printf("  Memory delta:              %s%n", formatBytes(memEnd - memStart));
             w.println(SEPARATOR);
 
-            // Dimension load times
             Map<String, WorldLoadProfiler.DimensionLoadData> dimensions = WorldLoadProfiler.getDimensionData();
             if (!dimensions.isEmpty()) {
                 w.println();
@@ -171,7 +160,6 @@ public class ReportWriter {
                         });
             }
 
-            // Milestones
             List<WorldLoadProfiler.LoadMilestone> milestones = WorldLoadProfiler.getMilestones();
             if (!milestones.isEmpty()) {
                 w.println();
@@ -184,7 +172,6 @@ public class ReportWriter {
                 }
             }
 
-            // Mod contributions
             Map<String, WorldLoadProfiler.ModWorldLoadData> modData = WorldLoadProfiler.getModContributions();
             if (!modData.isEmpty()) {
                 w.println();
@@ -227,8 +214,6 @@ public class ReportWriter {
         LOGGER.info("World load report written to {}", reportFile);
     }
 
-    // ========== WORLDGEN REPORT ==========
-
     public static void writeWorldGenReport(Path gameDir) {
         Path reportFile = gameDir.resolve("logs/whysoslow/worldgen.log");
         try {
@@ -265,7 +250,6 @@ public class ReportWriter {
             }
             w.println(SEPARATOR);
 
-            // Overall breakdown
             w.println();
             w.println("OVERALL CATEGORY BREAKDOWN:");
             w.println(THIN_SEP);
@@ -279,21 +263,18 @@ public class ReportWriter {
                 w.println("  No worldgen data collected.");
             }
 
-            // Top features
             if (!features.isEmpty()) {
                 w.println();
                 w.println("ALL FEATURES (slowest to fastest by total time):");
                 w.println(SEPARATOR);
                 writeTimingEntries(w, features);
 
-                // Group by mod
                 w.println();
                 w.println("FEATURES BY MOD:");
                 w.println(SEPARATOR);
                 writeGroupedByMod(w, features);
             }
 
-            // Structures
             if (!structures.isEmpty()) {
                 w.println();
                 w.println("ALL STRUCTURES (slowest to fastest by total time):");
@@ -301,7 +282,6 @@ public class ReportWriter {
                 writeTimingEntries(w, structures);
             }
 
-            // Carvers
             if (!carvers.isEmpty()) {
                 w.println();
                 w.println("ALL CARVERS (slowest to fastest by total time):");
@@ -346,11 +326,9 @@ public class ReportWriter {
     }
 
     private static void writeGroupedByMod(PrintWriter w, Map<ResourceLocation, WorldGenProfiler.TimingEntry> entries) {
-        // Group by namespace
         Map<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>> byMod = entries.entrySet().stream()
                 .collect(Collectors.groupingBy(e -> e.getKey().getNamespace()));
 
-        // Sort mods by total time
         List<Map.Entry<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>>> sortedMods =
                 byMod.entrySet().stream()
                         .sorted(Comparator.comparingLong((Map.Entry<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>> e) ->
@@ -369,7 +347,6 @@ public class ReportWriter {
             w.printf("#%-3d  %s  -  %s total across %d features (%d placements)%n",
                     rank, modId, formatNanos(modTotal), modFeatures.size(), modCalls);
 
-            // Sort features within mod
             modFeatures.stream()
                     .sorted(Comparator.comparingLong((Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry> e) ->
                             e.getValue().getTotalNanos()).reversed())
@@ -383,8 +360,6 @@ public class ReportWriter {
                     });
         }
     }
-
-    // ========== Formatting Utilities ==========
 
     private static String formatNanos(long nanos) {
         if (nanos < 0) return "-" + formatNanos(-nanos);

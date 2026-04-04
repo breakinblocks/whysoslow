@@ -19,13 +19,8 @@ public class WorldLoadProfiler {
     private static volatile long memoryAtEnd = 0;
     private static volatile String worldName = "Unknown";
 
-    // Per-dimension load times
     private static final ConcurrentHashMap<String, DimensionLoadData> dimensionData = new ConcurrentHashMap<>();
-
-    // Per-mod contributions during world load events
     private static final ConcurrentHashMap<String, ModWorldLoadData> modContributions = new ConcurrentHashMap<>();
-
-    // Milestones during loading
     private static final List<LoadMilestone> milestones = Collections.synchronizedList(new ArrayList<>());
 
     public static void begin(String name) {
@@ -89,7 +84,6 @@ public class WorldLoadProfiler {
         milestones.add(new LoadMilestone(System.nanoTime(), description));
     }
 
-    // Getters
     public static long getWorldLoadStartNanos() { return worldLoadStartNanos; }
     public static long getWorldLoadEndNanos() { return worldLoadEndNanos; }
     public static long getCreateLevelsStartNanos() { return createLevelsStartNanos; }

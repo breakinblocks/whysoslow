@@ -15,10 +15,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * Times structure generation (placeInChunk) and attributes
- * each structure to its mod via registry lookup.
- */
 @Mixin(StructureStart.class)
 public abstract class MixinStructureStart {
 

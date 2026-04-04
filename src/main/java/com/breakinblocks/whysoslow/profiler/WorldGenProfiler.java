@@ -23,25 +23,20 @@ public class WorldGenProfiler {
     private static volatile long profilingStartMs = 0;
     private static volatile long profilingEndMs = 0;
 
-    // Identity maps for registry lookups (populated when profiling starts)
     private static final IdentityHashMap<PlacedFeature, ResourceLocation> featureIds = new IdentityHashMap<>();
     private static final IdentityHashMap<Structure, ResourceLocation> structureIds = new IdentityHashMap<>();
     private static final IdentityHashMap<ConfiguredWorldCarver<?>, ResourceLocation> carverIds = new IdentityHashMap<>();
 
-    // Timing accumulators
     private static final ConcurrentHashMap<ResourceLocation, TimingEntry> featureTimings = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<ResourceLocation, TimingEntry> structureTimings = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<ResourceLocation, TimingEntry> carverTimings = new ConcurrentHashMap<>();
 
-    // Overall category timings
     private static final AtomicLong totalNoiseFillNanos = new AtomicLong();
     private static final AtomicLong totalSurfaceBuildNanos = new AtomicLong();
     private static final AtomicLong totalBiomeDecorationNanos = new AtomicLong();
     private static final AtomicLong noiseFillCount = new AtomicLong();
     private static final AtomicLong surfaceBuildCount = new AtomicLong();
     private static final AtomicLong biomeDecorationCount = new AtomicLong();
-
-    // Per-chunk timing
     private static final AtomicLong totalChunksProfiled = new AtomicLong();
 
     public static boolean isActive() {
@@ -110,8 +105,6 @@ public class WorldGenProfiler {
         }
     }
 
-    // --- Recording methods called from mixins ---
-
     public static void recordFeaturePlacement(PlacedFeature feature, long nanos) {
         if (!active) return;
         ResourceLocation id = featureIds.getOrDefault(feature, new ResourceLocation("unknown", "unknown_feature"));
@@ -150,8 +143,6 @@ public class WorldGenProfiler {
         totalChunksProfiled.incrementAndGet();
     }
 
-    // --- Data access for report ---
-
     public static long getProfilingStartMs() { return profilingStartMs; }
     public static long getProfilingEndMs() { return profilingEndMs; }
     public static long getTotalChunksProfiled() { return totalChunksProfiled.get(); }
@@ -171,7 +162,6 @@ public class WorldGenProfiler {
                 || !structureTimings.isEmpty() || !carverTimings.isEmpty();
     }
 
-    // Thread-safe timing accumulator
     public static class TimingEntry {
         private final AtomicLong totalNanos = new AtomicLong();
         private final AtomicLong count = new AtomicLong();
@@ -180,7 +170,6 @@ public class WorldGenProfiler {
         public void record(long nanos) {
             totalNanos.addAndGet(nanos);
             count.incrementAndGet();
-            // CAS loop for max
             long prev;
             do {
                 prev = maxNanos.get();
