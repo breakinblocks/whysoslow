@@ -1,0 +1,90 @@
+package com.breakinblocks.whysoslow.mixin;
+
+import com.breakinblocks.whysoslow.profiler.WorldGenProfiler;
+import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
+import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.blending.Blender;
+import net.minecraft.server.level.WorldGenRegion;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+
+/**
+ * Times noise-based terrain generation (fillFromNoise) and
+ * surface building (buildSurface) in the noise chunk generator.
+ */
+@Mixin(NoiseBasedChunkGenerator.class)
+public abstract class MixinNoiseBasedChunkGenerator {
+
+    @Unique
+    private static final ThreadLocal<Long> whysoslow$noiseStartTime = new ThreadLocal<>();
+
+    @Unique
+    private static final ThreadLocal<Long> whysoslow$surfaceStartTime = new ThreadLocal<>();
+
+    // --- fillFromNoise timing ---
+
+    @Inject(method = "fillFromNoise", at = @At("HEAD"))
+    private void whysoslow$onFillNoiseStart(Executor executor, Blender blender,
+                                             RandomState randomState,
+                                             StructureManager structureManager,
+                                             ChunkAccess chunk,
+                                             CallbackInfoReturnable<CompletableFuture<ChunkAccess>> cir) {
+        if (WorldGenProfiler.isActive()) {
+            whysoslow$noiseStartTime.set(System.nanoTime());
+        }
+    }
+
+    @Inject(method = "fillFromNoise", at = @At("RETURN"))
+    private void whysoslow$onFillNoiseEnd(Executor executor, Blender blender,
+                                           RandomState randomState,
+                                           StructureManager structureManager,
+                                           ChunkAccess chunk,
+                                           CallbackInfoReturnable<CompletableFuture<ChunkAccess>> cir) {
+        if (WorldGenProfiler.isActive()) {
+            Long start = whysoslow$noiseStartTime.get();
+            if (start != null) {
+                long elapsed = System.nanoTime() - start;
+                whysoslow$noiseStartTime.remove();
+                WorldGenProfiler.recordNoiseFill(elapsed);
+            }
+        }
+    }
+
+    // --- buildSurface timing ---
+
+    @Inject(method = "buildSurface", at = @At("HEAD"))
+    private void whysoslow$onBuildSurfaceStart(WorldGenRegion level,
+                                                StructureManager structureManager,
+                                                RandomState randomState,
+                                                ChunkAccess chunk,
+                                                CallbackInfo ci) {
+        if (WorldGenProfiler.isActive()) {
+            whysoslow$surfaceStartTime.set(System.nanoTime());
+        }
+    }
+
+    @Inject(method = "buildSurface", at = @At("RETURN"))
+    private void whysoslow$onBuildSurfaceEnd(WorldGenRegion level,
+                                              StructureManager structureManager,
+                                              RandomState randomState,
+                                              ChunkAccess chunk,
+                                              CallbackInfo ci) {
+        if (WorldGenProfiler.isActive()) {
+            Long start = whysoslow$surfaceStartTime.get();
+            if (start != null) {
+                long elapsed = System.nanoTime() - start;
+                whysoslow$surfaceStartTime.remove();
+                WorldGenProfiler.recordSurfaceBuild(elapsed);
+            }
+        }
+    }
+}

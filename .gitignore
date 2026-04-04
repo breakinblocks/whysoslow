@@ -1,0 +1,19 @@
+build/
+run/
+.gradle/
+out/
+*.iml
+*.ipr
+*.iws
+.idea/
+.settings/
+.classpath
+.project
+bin/
+src/generated/
+
+# Ignore all .md files except README, LICENSE, and metadata folder
+*.md
+!README.md
+!LICENSE.md
+!.claude/**/

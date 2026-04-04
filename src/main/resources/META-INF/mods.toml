@@ -1,0 +1,33 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+issueTrackerURL="https://github.com/breakinblocks/whysoslow/issues"
+
+[[mods]]
+modId="whysoslow"
+version="${file.jarVersion}"
+displayName="WhySoSlow"
+authors="BreakInBlocks"
+description='''
+Extremely detailed performance analysis of mods during startup, world loading, and world generation.
+Tracks per-mod CPU time, memory usage, and wall-clock duration across all loading phases.
+Provides /whysoslow command for runtime worldgen profiling.
+'''
+
+[[dependencies.whysoslow]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.whysoslow]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[mixins]]
+config="whysoslow.mixins.json"

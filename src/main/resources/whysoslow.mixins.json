@@ -1,0 +1,19 @@
+{
+    "required": true,
+    "minVersion": "0.8",
+    "package": "com.breakinblocks.whysoslow.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "refmap": "whysoslow.refmap.json",
+    "mixins": [
+        "MixinModContainer",
+        "MixinMinecraftServer",
+        "MixinChunkGenerator",
+        "MixinNoiseBasedChunkGenerator",
+        "MixinPlacedFeature",
+        "MixinStructureStart",
+        "MixinConfiguredWorldCarver"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    }
+}

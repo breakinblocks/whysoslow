@@ -1,0 +1,9 @@
+{
+    "commands.whysoslow.profiling.started": "WorldGen profiling started. Explore the world to collect data, then run /whysoslow stop.",
+    "commands.whysoslow.profiling.already_active": "WorldGen profiling is already active!",
+    "commands.whysoslow.profiling.stopped": "WorldGen profiling stopped. Report written to logs/whysoslow/worldgen.log",
+    "commands.whysoslow.profiling.not_active": "WorldGen profiling is not currently active.",
+    "commands.whysoslow.profiling.no_data": "WorldGen profiling stopped but no data was collected. Try exploring more chunks first.",
+    "commands.whysoslow.startup.written": "Startup report written to logs/whysoslow/startup.log",
+    "commands.whysoslow.worldload.written": "World load report written to logs/whysoslow/worldload.log"
+}
