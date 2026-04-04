@@ -9,15 +9,15 @@ import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class WorldGenProfiler {
-    private static final Logger LOGGER = LogManager.getLogger("WhySoSlow/WorldGen");
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static volatile boolean active = false;
     private static volatile long profilingStartMs = 0;
@@ -107,20 +107,20 @@ public class WorldGenProfiler {
 
     public static void recordFeaturePlacement(PlacedFeature feature, long nanos) {
         if (!active) return;
-        ResourceLocation id = featureIds.getOrDefault(feature, new ResourceLocation("unknown", "unknown_feature"));
+        ResourceLocation id = featureIds.getOrDefault(feature, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_feature"));
         featureTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
     public static void recordStructureGeneration(StructureStart structureStart, long nanos) {
         if (!active) return;
         Structure structure = structureStart.getStructure();
-        ResourceLocation id = structureIds.getOrDefault(structure, new ResourceLocation("unknown", "unknown_structure"));
+        ResourceLocation id = structureIds.getOrDefault(structure, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_structure"));
         structureTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
     public static void recordCarver(ConfiguredWorldCarver<?> carver, long nanos) {
         if (!active) return;
-        ResourceLocation id = carverIds.getOrDefault(carver, new ResourceLocation("unknown", "unknown_carver"));
+        ResourceLocation id = carverIds.getOrDefault(carver, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_carver"));
         carverTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 

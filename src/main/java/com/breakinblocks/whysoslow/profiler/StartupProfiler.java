@@ -1,11 +1,11 @@
 package com.breakinblocks.whysoslow.profiler;
 
-import net.minecraftforge.eventbus.api.Event;
-import net.minecraftforge.fml.event.lifecycle.*;
-import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.registries.IForgeRegistry;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.mojang.logging.LogUtils;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.neoforged.bus.api.Event;
+import net.neoforged.fml.event.lifecycle.*;
+import org.slf4j.Logger;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class StartupProfiler {
-    private static final Logger LOGGER = LogManager.getLogger("WhySoSlow/Startup");
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final ThreadMXBean THREAD_MX = ManagementFactory.getThreadMXBean();
 
     private static final long JVM_START_MS = ManagementFactory.getRuntimeMXBean().getStartTime();
@@ -81,45 +81,31 @@ public class StartupProfiler {
         return Collections.unmodifiableMap(modData);
     }
 
-    public static long getJvmStartMs() {
-        return JVM_START_MS;
-    }
-
-    public static long getFirstEventTimeMs() {
-        return firstEventTimeMs;
-    }
-
-    public static long getLastEventTimeMs() {
-        return lastEventTimeMs;
-    }
-
-    public static int getModCount() {
-        return modData.size();
-    }
+    public static long getJvmStartMs() { return JVM_START_MS; }
+    public static long getFirstEventTimeMs() { return firstEventTimeMs; }
+    public static long getLastEventTimeMs() { return lastEventTimeMs; }
+    public static int getModCount() { return modData.size(); }
 
     public static Map<String, Map<String, Integer>> countRegistryEntries() {
         Map<String, Map<String, Integer>> counts = new HashMap<>();
 
-        countRegistry(counts, "blocks", ForgeRegistries.BLOCKS);
-        countRegistry(counts, "items", ForgeRegistries.ITEMS);
-        countRegistry(counts, "block_entities", ForgeRegistries.BLOCK_ENTITY_TYPES);
-        countRegistry(counts, "entities", ForgeRegistries.ENTITY_TYPES);
-        countRegistry(counts, "menus", ForgeRegistries.MENU_TYPES);
-        countRegistry(counts, "recipes", ForgeRegistries.RECIPE_SERIALIZERS);
-        countRegistry(counts, "sounds", ForgeRegistries.SOUND_EVENTS);
-        countRegistry(counts, "effects", ForgeRegistries.MOB_EFFECTS);
-        countRegistry(counts, "enchantments", ForgeRegistries.ENCHANTMENTS);
-        countRegistry(counts, "biomes", ForgeRegistries.BIOMES);
-        countRegistry(counts, "features", ForgeRegistries.FEATURES);
-        countRegistry(counts, "particles", ForgeRegistries.PARTICLE_TYPES);
+        countRegistry(counts, "blocks", BuiltInRegistries.BLOCK);
+        countRegistry(counts, "items", BuiltInRegistries.ITEM);
+        countRegistry(counts, "block_entities", BuiltInRegistries.BLOCK_ENTITY_TYPE);
+        countRegistry(counts, "entities", BuiltInRegistries.ENTITY_TYPE);
+        countRegistry(counts, "menus", BuiltInRegistries.MENU);
+        countRegistry(counts, "recipe_serializers", BuiltInRegistries.RECIPE_SERIALIZER);
+        countRegistry(counts, "sounds", BuiltInRegistries.SOUND_EVENT);
+        countRegistry(counts, "effects", BuiltInRegistries.MOB_EFFECT);
+        countRegistry(counts, "particles", BuiltInRegistries.PARTICLE_TYPE);
 
         return counts;
     }
 
     private static <T> void countRegistry(Map<String, Map<String, Integer>> counts,
-                                          String registryName, IForgeRegistry<T> registry) {
-        for (var entry : registry.getEntries()) {
-            String namespace = entry.getKey().location().getNamespace();
+                                          String registryName, Registry<T> registry) {
+        for (var key : registry.keySet()) {
+            String namespace = key.getNamespace();
             counts.computeIfAbsent(namespace, k -> new LinkedHashMap<>())
                     .merge(registryName, 1, Integer::sum);
         }
@@ -133,10 +119,7 @@ public class StartupProfiler {
     private static String getPhaseFromEvent(Event event) {
         if (event instanceof FMLConstructModEvent) return "Construction";
         if (event instanceof FMLCommonSetupEvent) return "Common Setup";
-        if (event instanceof FMLClientSetupEvent) return "Client Setup";
         if (event instanceof FMLLoadCompleteEvent) return "Load Complete";
-        if (event instanceof InterModEnqueueEvent) return "IMC Enqueue";
-        if (event instanceof InterModProcessEvent) return "IMC Process";
 
         String className = event.getClass().getSimpleName();
         if (className.contains("Register")) return "Registry";

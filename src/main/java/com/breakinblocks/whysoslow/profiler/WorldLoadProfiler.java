@@ -1,14 +1,14 @@
 package com.breakinblocks.whysoslow.profiler;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class WorldLoadProfiler {
-    private static final Logger LOGGER = LogManager.getLogger("WhySoSlow/WorldLoad");
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static volatile boolean active = false;
     private static volatile long worldLoadStartNanos = 0;

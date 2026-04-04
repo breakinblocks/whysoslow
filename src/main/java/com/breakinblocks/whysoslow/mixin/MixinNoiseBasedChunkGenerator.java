@@ -1,12 +1,12 @@
 package com.breakinblocks.whysoslow.mixin;
 
 import com.breakinblocks.whysoslow.profiler.WorldGenProfiler;
+import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.blending.Blender;
-import net.minecraft.server.level.WorldGenRegion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 @Mixin(NoiseBasedChunkGenerator.class)
 public abstract class MixinNoiseBasedChunkGenerator {
@@ -27,7 +26,7 @@ public abstract class MixinNoiseBasedChunkGenerator {
     private static final ThreadLocal<Long> whysoslow$surfaceStartTime = new ThreadLocal<>();
 
     @Inject(method = "fillFromNoise", at = @At("HEAD"))
-    private void whysoslow$onFillNoiseStart(Executor executor, Blender blender,
+    private void whysoslow$onFillNoiseStart(Blender blender,
                                              RandomState randomState,
                                              StructureManager structureManager,
                                              ChunkAccess chunk,
@@ -38,7 +37,7 @@ public abstract class MixinNoiseBasedChunkGenerator {
     }
 
     @Inject(method = "fillFromNoise", at = @At("RETURN"))
-    private void whysoslow$onFillNoiseEnd(Executor executor, Blender blender,
+    private void whysoslow$onFillNoiseEnd(Blender blender,
                                            RandomState randomState,
                                            StructureManager structureManager,
                                            ChunkAccess chunk,
@@ -53,7 +52,7 @@ public abstract class MixinNoiseBasedChunkGenerator {
         }
     }
 
-    @Inject(method = "buildSurface", at = @At("HEAD"))
+    @Inject(method = "buildSurface(Lnet/minecraft/server/level/WorldGenRegion;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/chunk/ChunkAccess;)V", at = @At("HEAD"))
     private void whysoslow$onBuildSurfaceStart(WorldGenRegion level,
                                                 StructureManager structureManager,
                                                 RandomState randomState,
@@ -64,7 +63,7 @@ public abstract class MixinNoiseBasedChunkGenerator {
         }
     }
 
-    @Inject(method = "buildSurface", at = @At("RETURN"))
+    @Inject(method = "buildSurface(Lnet/minecraft/server/level/WorldGenRegion;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/chunk/ChunkAccess;)V", at = @At("RETURN"))
     private void whysoslow$onBuildSurfaceEnd(WorldGenRegion level,
                                               StructureManager structureManager,
                                               RandomState randomState,

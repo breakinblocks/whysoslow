@@ -1,8 +1,8 @@
 package com.breakinblocks.whysoslow.profiler;
 
 import net.minecraft.resources.ResourceLocation;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class ReportWriter {
-    private static final Logger LOGGER = LogManager.getLogger("WhySoSlow/Report");
+    private static final Logger LOGGER = LogUtils.getLogger();
     private static final String SEPARATOR = "=".repeat(90);
     private static final String THIN_SEP = "-".repeat(90);
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
