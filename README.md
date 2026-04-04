@@ -1,35 +1,49 @@
 # WhySoSlow
 
-A Forge 1.20.1 mod that performs extremely detailed performance analysis of mods during startup, world loading, and world generation.
+A Minecraft mod that performs extremely detailed performance analysis of mods during startup, world loading, and world generation.
+
+## Supported Versions
+
+WhySoSlow is released for multiple Minecraft versions on separate branches:
+
+| Branch | Minecraft | Loader | Java |
+|---|---|---|---|
+| `1.20.1` | 1.20.1 | Forge | 17 |
+| `1.21.1` | 1.21.1 | NeoForge | 21 |
+| `26.1` | 26.1 | NeoForge | 25 |
+
+Artifacts are published to `maven.breakinblocks.com` with version format `<minecraft-version>-<mod-version>` (e.g., `whysoslow-1.21.1-1.0.4.jar`) and attached to GitHub releases tagged `v<minecraft-version>-<mod-version>`.
 
 ## WARNING
 
 **This mod is a debugging tool only. Do not ship it in production modpacks.**
 
-WhySoSlow uses Mixin to inject into Forge internals and Minecraft's worldgen pipeline. This means:
+WhySoSlow uses Mixin to inject into loader internals and Minecraft's worldgen pipeline. Where loader internals cannot be transformed (module-layer classes), it uses reflection to wrap event bus listeners directly. This means:
 
 - **It is itself a source of performance loss.** Every mod event, every placed feature, every structure, every carver, and every noise fill operation is wrapped with timing instrumentation. This overhead is unavoidable and will make your game slower while the mod is installed.
-- **It mixes into critical code paths.** Mixin class transformations are applied to `ModContainer`, `MinecraftServer`, `ChunkGenerator`, `NoiseBasedChunkGenerator`, `PlacedFeature`, `StructureStart`, and `ConfiguredWorldCarver`. While these injections are carefully written, they carry inherent risk.
+- **It mixes into critical code paths.** Mixin class transformations are applied to Minecraft worldgen classes including `MinecraftServer`, `ChunkGenerator`, `NoiseBasedChunkGenerator`, `PlacedFeature`, `StructureStart`, and `ConfiguredWorldCarver`. While these injections are carefully written, they carry inherent risk.
+- **It modifies event bus listener lists at runtime.** To capture per-mod timing during startup and world load, WhySoSlow uses reflection to wrap every other mod's registered event handlers.
 - **Install it, collect your data, then remove it.** Do not leave this mod installed longer than necessary.
 
 ## What It Does
 
 ### Startup Profiling (Automatic)
 
-On every game launch, WhySoSlow intercepts Forge's `ModContainer.acceptEvent` to time every mod's handling of every lifecycle event. When loading completes, a report is written to:
+On every game launch, WhySoSlow times every mod's handling of every lifecycle event. When loading completes, a report is written to:
 
 ```
 logs/whysoslow/startup.log
 ```
 
 The report includes for every mod, sorted slowest to fastest:
-- Wall-clock time, CPU time, and memory delta per loading phase (Construction, Registry, Common Setup, Client Setup, Load Complete, IMC)
+
+- Wall-clock time, CPU time, and memory delta per loading phase (Construction, Registry, Common Setup, Client Setup, Load Complete)
 - Registry entry counts (blocks, items, entities, etc.)
 - Overall phase breakdown and total startup time
 
 ### World Load Profiling (Automatic)
 
-When you load into a world, WhySoSlow measures dimension creation time, memory usage, and mod contributions during the server start lifecycle. A report is written to:
+When you load into a world, WhySoSlow measures dimension creation time, memory usage, and per-mod contributions during the server start lifecycle. A report is written to:
 
 ```
 logs/whysoslow/worldload.log
@@ -52,6 +66,7 @@ logs/whysoslow/worldgen.log
 ```
 
 The worldgen report breaks down:
+
 - **Overall category split** - Noise generation, surface building, feature placement, structure generation, and carvers with percentages
 - **Every placed feature** - Total time, average time, max time, and call count, attributed to the owning mod
 - **Features grouped by mod** - Which mods' worldgen features cost the most
@@ -62,8 +77,8 @@ The worldgen report breaks down:
 
 | Mixin | Target | Purpose |
 |---|---|---|
-| `MixinModContainer` | `ModContainer.acceptEvent` | Per-mod lifecycle event timing |
-| `MixinMinecraftServer` | `MinecraftServer.createLevels` | Dimension creation timing |
+| `MixinMinecraftServer` | `MinecraftServer.createLevels` / `prepareLevels` | Dimension creation and chunk load timing |
+| `MixinServerLevel` | `ServerLevel.<init>` | Per-dimension construction timing |
 | `MixinChunkGenerator` | `ChunkGenerator.applyBiomeDecoration` | Per-chunk decoration timing |
 | `MixinNoiseBasedChunkGenerator` | `fillFromNoise`, `buildSurface` | Terrain and surface timing |
 | `MixinPlacedFeature` | `PlacedFeature.placeWithBiomeCheck` | Per-feature timing |
@@ -72,10 +87,10 @@ The worldgen report breaks down:
 
 ## Building
 
-Requires Java 17.
+Each branch targets a specific Java version (see the table above). Point `JAVA_HOME` at the matching JDK before running Gradle:
 
 ```bash
-export JAVA_HOME="/path/to/jdk-17"
+export JAVA_HOME="/path/to/matching-jdk"
 ./gradlew build
 ```
 
