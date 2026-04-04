@@ -28,6 +28,7 @@ jobs:
         run: chmod +x gradlew && ./gradlew clean build
 
       - name: Publish to Maven
+        continue-on-error: true
         run: ./gradlew publish
         env:
           MAVEN_USER: ${{ secrets.MAVEN_USER }}
