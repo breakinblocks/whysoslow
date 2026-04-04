@@ -3,7 +3,7 @@ package com.breakinblocks.whysoslow.profiler;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
@@ -23,13 +23,13 @@ public class WorldGenProfiler {
     private static volatile long profilingStartMs = 0;
     private static volatile long profilingEndMs = 0;
 
-    private static final IdentityHashMap<PlacedFeature, ResourceLocation> featureIds = new IdentityHashMap<>();
-    private static final IdentityHashMap<Structure, ResourceLocation> structureIds = new IdentityHashMap<>();
-    private static final IdentityHashMap<ConfiguredWorldCarver<?>, ResourceLocation> carverIds = new IdentityHashMap<>();
+    private static final IdentityHashMap<PlacedFeature, Identifier> featureIds = new IdentityHashMap<>();
+    private static final IdentityHashMap<Structure, Identifier> structureIds = new IdentityHashMap<>();
+    private static final IdentityHashMap<ConfiguredWorldCarver<?>, Identifier> carverIds = new IdentityHashMap<>();
 
-    private static final ConcurrentHashMap<ResourceLocation, TimingEntry> featureTimings = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<ResourceLocation, TimingEntry> structureTimings = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<ResourceLocation, TimingEntry> carverTimings = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Identifier, TimingEntry> featureTimings = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Identifier, TimingEntry> structureTimings = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Identifier, TimingEntry> carverTimings = new ConcurrentHashMap<>();
 
     private static final AtomicLong totalNoiseFillNanos = new AtomicLong();
     private static final AtomicLong totalSurfaceBuildNanos = new AtomicLong();
@@ -78,27 +78,27 @@ public class WorldGenProfiler {
         carverIds.clear();
 
         try {
-            Registry<PlacedFeature> pfReg = server.registryAccess().registryOrThrow(Registries.PLACED_FEATURE);
+            Registry<PlacedFeature> pfReg = server.registryAccess().lookupOrThrow(Registries.PLACED_FEATURE);
             for (Map.Entry<ResourceKey<PlacedFeature>, PlacedFeature> entry : pfReg.entrySet()) {
-                featureIds.put(entry.getValue(), entry.getKey().location());
+                featureIds.put(entry.getValue(), entry.getKey().identifier());
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to build PlacedFeature lookup map", e);
         }
 
         try {
-            Registry<Structure> sReg = server.registryAccess().registryOrThrow(Registries.STRUCTURE);
+            Registry<Structure> sReg = server.registryAccess().lookupOrThrow(Registries.STRUCTURE);
             for (Map.Entry<ResourceKey<Structure>, Structure> entry : sReg.entrySet()) {
-                structureIds.put(entry.getValue(), entry.getKey().location());
+                structureIds.put(entry.getValue(), entry.getKey().identifier());
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to build Structure lookup map", e);
         }
 
         try {
-            Registry<ConfiguredWorldCarver<?>> cReg = server.registryAccess().registryOrThrow(Registries.CONFIGURED_CARVER);
+            Registry<ConfiguredWorldCarver<?>> cReg = server.registryAccess().lookupOrThrow(Registries.CONFIGURED_CARVER);
             for (Map.Entry<ResourceKey<ConfiguredWorldCarver<?>>, ConfiguredWorldCarver<?>> entry : cReg.entrySet()) {
-                carverIds.put(entry.getValue(), entry.getKey().location());
+                carverIds.put(entry.getValue(), entry.getKey().identifier());
             }
         } catch (Exception e) {
             LOGGER.warn("Failed to build ConfiguredWorldCarver lookup map", e);
@@ -107,20 +107,20 @@ public class WorldGenProfiler {
 
     public static void recordFeaturePlacement(PlacedFeature feature, long nanos) {
         if (!active) return;
-        ResourceLocation id = featureIds.getOrDefault(feature, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_feature"));
+        Identifier id = featureIds.getOrDefault(feature, Identifier.fromNamespaceAndPath("unknown", "unknown_feature"));
         featureTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
     public static void recordStructureGeneration(StructureStart structureStart, long nanos) {
         if (!active) return;
         Structure structure = structureStart.getStructure();
-        ResourceLocation id = structureIds.getOrDefault(structure, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_structure"));
+        Identifier id = structureIds.getOrDefault(structure, Identifier.fromNamespaceAndPath("unknown", "unknown_structure"));
         structureTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
     public static void recordCarver(ConfiguredWorldCarver<?> carver, long nanos) {
         if (!active) return;
-        ResourceLocation id = carverIds.getOrDefault(carver, ResourceLocation.fromNamespaceAndPath("unknown", "unknown_carver"));
+        Identifier id = carverIds.getOrDefault(carver, Identifier.fromNamespaceAndPath("unknown", "unknown_carver"));
         carverTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
@@ -153,9 +153,9 @@ public class WorldGenProfiler {
     public static long getSurfaceBuildCount() { return surfaceBuildCount.get(); }
     public static long getBiomeDecorationCount() { return biomeDecorationCount.get(); }
 
-    public static Map<ResourceLocation, TimingEntry> getFeatureTimings() { return Collections.unmodifiableMap(featureTimings); }
-    public static Map<ResourceLocation, TimingEntry> getStructureTimings() { return Collections.unmodifiableMap(structureTimings); }
-    public static Map<ResourceLocation, TimingEntry> getCarverTimings() { return Collections.unmodifiableMap(carverTimings); }
+    public static Map<Identifier, TimingEntry> getFeatureTimings() { return Collections.unmodifiableMap(featureTimings); }
+    public static Map<Identifier, TimingEntry> getStructureTimings() { return Collections.unmodifiableMap(structureTimings); }
+    public static Map<Identifier, TimingEntry> getCarverTimings() { return Collections.unmodifiableMap(carverTimings); }
 
     public static boolean hasData() {
         return totalChunksProfiled.get() > 0 || !featureTimings.isEmpty()

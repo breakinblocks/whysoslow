@@ -1,5 +1,6 @@
 package com.breakinblocks.whysoslow;
 
+import com.breakinblocks.whysoslow.profiler.ForgeBusContributionTracker;
 import com.breakinblocks.whysoslow.profiler.ReportWriter;
 import com.breakinblocks.whysoslow.profiler.StartupProfiler;
 import com.mojang.logging.LogUtils;
@@ -13,7 +14,6 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.event.lifecycle.FMLConstructModEvent;
 import net.neoforged.fml.event.lifecycle.FMLLoadCompleteEvent;
 import net.neoforged.fml.loading.FMLPaths;
-import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.registries.RegisterEvent;
 import org.slf4j.Logger;
@@ -32,6 +32,11 @@ public class WhySoSlow {
         NeoForge.EVENT_BUS.register(com.breakinblocks.whysoslow.commands.WhySoSlowCommand.class);
 
         installTimingListeners();
+
+        modEventBus.addListener(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent.class, e -> e.enqueueWork(() -> {
+            ForgeBusContributionTracker.wrapListeners(NeoForge.EVENT_BUS,
+                    net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class, "ServerAboutToStart");
+        }));
     }
 
     private void installTimingListeners() {

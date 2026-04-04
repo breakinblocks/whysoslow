@@ -1,12 +1,14 @@
 package com.breakinblocks.whysoslow.events;
 
 import com.breakinblocks.whysoslow.WhySoSlow;
+import com.breakinblocks.whysoslow.profiler.ForgeBusContributionTracker;
 import com.breakinblocks.whysoslow.profiler.ReportWriter;
 import com.breakinblocks.whysoslow.profiler.WorldGenProfiler;
 import com.breakinblocks.whysoslow.profiler.WorldLoadProfiler;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.loading.FMLPaths;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerAboutToStartEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
@@ -19,6 +21,9 @@ public class WhySoSlowEventHandler {
         String worldName = event.getServer().getWorldData().getLevelName();
         WorldLoadProfiler.begin(worldName);
         WorldLoadProfiler.addMilestone("ServerAboutToStartEvent fired");
+
+        ForgeBusContributionTracker.wrapListeners(NeoForge.EVENT_BUS, ServerStartingEvent.class, "ServerStarting");
+        ForgeBusContributionTracker.wrapListeners(NeoForge.EVENT_BUS, ServerStartedEvent.class, "ServerStarted");
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)

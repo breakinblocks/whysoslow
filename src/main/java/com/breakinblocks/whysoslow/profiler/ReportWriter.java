@@ -1,6 +1,6 @@
 package com.breakinblocks.whysoslow.profiler;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -230,9 +230,9 @@ public class ReportWriter {
         long surfaceNanos = WorldGenProfiler.getTotalSurfaceBuildNanos();
         long decoNanos = WorldGenProfiler.getTotalBiomeDecorationNanos();
 
-        Map<ResourceLocation, WorldGenProfiler.TimingEntry> features = WorldGenProfiler.getFeatureTimings();
-        Map<ResourceLocation, WorldGenProfiler.TimingEntry> structures = WorldGenProfiler.getStructureTimings();
-        Map<ResourceLocation, WorldGenProfiler.TimingEntry> carvers = WorldGenProfiler.getCarverTimings();
+        Map<Identifier, WorldGenProfiler.TimingEntry> features = WorldGenProfiler.getFeatureTimings();
+        Map<Identifier, WorldGenProfiler.TimingEntry> structures = WorldGenProfiler.getStructureTimings();
+        Map<Identifier, WorldGenProfiler.TimingEntry> carvers = WorldGenProfiler.getCarverTimings();
 
         long totalFeatureNanos = features.values().stream().mapToLong(WorldGenProfiler.TimingEntry::getTotalNanos).sum();
         long totalStructureNanos = structures.values().stream().mapToLong(WorldGenProfiler.TimingEntry::getTotalNanos).sum();
@@ -306,14 +306,14 @@ public class ReportWriter {
         w.printf("  %-25s %6.1f%%   %s   (%d operations)%n", name + ":", pct, formatNanos(nanos), count);
     }
 
-    private static void writeTimingEntries(PrintWriter w, Map<ResourceLocation, WorldGenProfiler.TimingEntry> entries) {
-        List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>> sorted = entries.entrySet().stream()
-                .sorted(Comparator.comparingLong((Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry> e) ->
+    private static void writeTimingEntries(PrintWriter w, Map<Identifier, WorldGenProfiler.TimingEntry> entries) {
+        List<Map.Entry<Identifier, WorldGenProfiler.TimingEntry>> sorted = entries.entrySet().stream()
+                .sorted(Comparator.comparingLong((Map.Entry<Identifier, WorldGenProfiler.TimingEntry> e) ->
                         e.getValue().getTotalNanos()).reversed())
                 .toList();
 
         int rank = 0;
-        for (Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry> entry : sorted) {
+        for (Map.Entry<Identifier, WorldGenProfiler.TimingEntry> entry : sorted) {
             rank++;
             WorldGenProfiler.TimingEntry t = entry.getValue();
             w.printf("  #%-4d %-50s %s total  |  avg %s  |  max %s  |  %d calls%n",
@@ -325,13 +325,13 @@ public class ReportWriter {
         }
     }
 
-    private static void writeGroupedByMod(PrintWriter w, Map<ResourceLocation, WorldGenProfiler.TimingEntry> entries) {
-        Map<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>> byMod = entries.entrySet().stream()
+    private static void writeGroupedByMod(PrintWriter w, Map<Identifier, WorldGenProfiler.TimingEntry> entries) {
+        Map<String, List<Map.Entry<Identifier, WorldGenProfiler.TimingEntry>>> byMod = entries.entrySet().stream()
                 .collect(Collectors.groupingBy(e -> e.getKey().getNamespace()));
 
-        List<Map.Entry<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>>> sortedMods =
+        List<Map.Entry<String, List<Map.Entry<Identifier, WorldGenProfiler.TimingEntry>>>> sortedMods =
                 byMod.entrySet().stream()
-                        .sorted(Comparator.comparingLong((Map.Entry<String, List<Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry>>> e) ->
+                        .sorted(Comparator.comparingLong((Map.Entry<String, List<Map.Entry<Identifier, WorldGenProfiler.TimingEntry>>> e) ->
                                 e.getValue().stream().mapToLong(f -> f.getValue().getTotalNanos()).sum()).reversed())
                         .toList();
 
@@ -348,7 +348,7 @@ public class ReportWriter {
                     rank, modId, formatNanos(modTotal), modFeatures.size(), modCalls);
 
             modFeatures.stream()
-                    .sorted(Comparator.comparingLong((Map.Entry<ResourceLocation, WorldGenProfiler.TimingEntry> e) ->
+                    .sorted(Comparator.comparingLong((Map.Entry<Identifier, WorldGenProfiler.TimingEntry> e) ->
                             e.getValue().getTotalNanos()).reversed())
                     .forEach(featureEntry -> {
                         WorldGenProfiler.TimingEntry t = featureEntry.getValue();

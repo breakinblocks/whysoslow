@@ -19,7 +19,7 @@ public class WhySoSlowCommand {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
 
         dispatcher.register(Commands.literal("whysoslow")
-                .requires(source -> source.hasPermission(2))
+                .requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
                 .then(Commands.literal("start")
                         .executes(context -> startProfiling(context.getSource()))
                 )

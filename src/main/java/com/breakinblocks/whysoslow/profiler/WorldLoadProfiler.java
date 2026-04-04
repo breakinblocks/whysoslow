@@ -31,6 +31,8 @@ public class WorldLoadProfiler {
         dimensionData.clear();
         modContributions.clear();
         milestones.clear();
+        lastDimensionEndNanos = 0;
+        lastDimensionMemory = 0;
         LOGGER.info("World load profiling started for '{}'", name);
     }
 
@@ -72,6 +74,28 @@ public class WorldLoadProfiler {
             data.memoryAfter = getUsedMemory();
         }
     }
+
+    public static void recordDimensionConstructed(String dimensionId) {
+        if (!active) return;
+        long now = System.nanoTime();
+        long startReference;
+        synchronized (dimensionData) {
+            startReference = lastDimensionEndNanos > 0 ? lastDimensionEndNanos :
+                    (createLevelsStartNanos > 0 ? createLevelsStartNanos : worldLoadStartNanos);
+            lastDimensionEndNanos = now;
+        }
+        long memAfter = getUsedMemory();
+        DimensionLoadData data = dimensionData.computeIfAbsent(dimensionId, k -> new DimensionLoadData());
+        data.startNanos = startReference;
+        data.endNanos = now;
+        data.memoryBefore = lastDimensionMemory > 0 ? lastDimensionMemory : memoryAtStart;
+        data.memoryAfter = memAfter;
+        lastDimensionMemory = memAfter;
+        addMilestone("Dimension " + dimensionId + " constructed");
+    }
+
+    private static volatile long lastDimensionEndNanos = 0;
+    private static volatile long lastDimensionMemory = 0;
 
     public static void recordModContribution(String modId, String activity, long nanos) {
         if (!active) return;
