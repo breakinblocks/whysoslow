@@ -10,9 +10,14 @@
         "MixinNoiseBasedChunkGenerator",
         "MixinPlacedFeature",
         "MixinStructureStart",
-        "MixinConfiguredWorldCarver"
+        "MixinConfiguredWorldCarver",
+        "MixinChunkStatusTasks",
+        "MixinSimpleReloadInstance"
     ],
     "injectors": {
         "defaultRequire": 1
-    }
+    },
+    "client": [
+        "client.MixinSpriteLoader"
+    ]
 }

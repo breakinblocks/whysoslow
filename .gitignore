@@ -17,3 +17,5 @@ src/generated/
 !README.md
 !LICENSE.md
 !.claude/**/
+
+.vscode/

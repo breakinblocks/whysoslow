@@ -1,5 +1,6 @@
 package com.breakinblocks.whysoslow.mixin;
 
+import com.breakinblocks.whysoslow.profiler.ChunkPipelineProfiler;
 import com.breakinblocks.whysoslow.profiler.WorldGenProfiler;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.StructureManager;
@@ -14,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.util.concurrent.CompletableFuture;
 
 @Mixin(NoiseBasedChunkGenerator.class)
 public abstract class MixinNoiseBasedChunkGenerator {
@@ -25,23 +25,31 @@ public abstract class MixinNoiseBasedChunkGenerator {
     @Unique
     private static final ThreadLocal<Long> whysoslow$surfaceStartTime = new ThreadLocal<>();
 
-    @Inject(method = "fillFromNoise", at = @At("HEAD"))
+    @Unique
+    private static final ThreadLocal<Long> whysoslow$biomeStartTime = new ThreadLocal<>();
+
+    @Inject(method = "doFill", at = @At("HEAD"))
     private void whysoslow$onFillNoiseStart(Blender blender,
-                                             RandomState randomState,
                                              StructureManager structureManager,
+                                             RandomState randomState,
                                              ChunkAccess chunk,
-                                             CallbackInfoReturnable<CompletableFuture<ChunkAccess>> cir) {
+                                             int minCellY,
+                                             int cellCountY,
+                                             CallbackInfoReturnable<ChunkAccess> cir) {
         if (WorldGenProfiler.isActive()) {
             whysoslow$noiseStartTime.set(System.nanoTime());
         }
+        ChunkPipelineProfiler.onNoiseStart();
     }
 
-    @Inject(method = "fillFromNoise", at = @At("RETURN"))
+    @Inject(method = "doFill", at = @At("RETURN"))
     private void whysoslow$onFillNoiseEnd(Blender blender,
-                                           RandomState randomState,
                                            StructureManager structureManager,
+                                           RandomState randomState,
                                            ChunkAccess chunk,
-                                           CallbackInfoReturnable<CompletableFuture<ChunkAccess>> cir) {
+                                           int minCellY,
+                                           int cellCountY,
+                                           CallbackInfoReturnable<ChunkAccess> cir) {
         if (WorldGenProfiler.isActive()) {
             Long start = whysoslow$noiseStartTime.get();
             if (start != null) {
@@ -50,6 +58,32 @@ public abstract class MixinNoiseBasedChunkGenerator {
                 WorldGenProfiler.recordNoiseFill(elapsed);
             }
         }
+        ChunkPipelineProfiler.onNoiseEnd();
+    }
+
+    @Inject(method = "doCreateBiomes", at = @At("HEAD"))
+    private void whysoslow$onBiomesStart(Blender blender, RandomState randomState,
+                                          StructureManager structureManager, ChunkAccess chunk,
+                                          CallbackInfo ci) {
+        if (WorldGenProfiler.isActive()) {
+            whysoslow$biomeStartTime.set(System.nanoTime());
+        }
+        ChunkPipelineProfiler.onBiomesStart();
+    }
+
+    @Inject(method = "doCreateBiomes", at = @At("RETURN"))
+    private void whysoslow$onBiomesEnd(Blender blender, RandomState randomState,
+                                        StructureManager structureManager, ChunkAccess chunk,
+                                        CallbackInfo ci) {
+        if (WorldGenProfiler.isActive()) {
+            Long start = whysoslow$biomeStartTime.get();
+            if (start != null) {
+                long elapsed = System.nanoTime() - start;
+                whysoslow$biomeStartTime.remove();
+                WorldGenProfiler.recordBiomeFill(elapsed);
+            }
+        }
+        ChunkPipelineProfiler.onBiomesEnd();
     }
 
     @Inject(method = "buildSurface(Lnet/minecraft/server/level/WorldGenRegion;Lnet/minecraft/world/level/StructureManager;Lnet/minecraft/world/level/levelgen/RandomState;Lnet/minecraft/world/level/chunk/ChunkAccess;)V", at = @At("HEAD"))

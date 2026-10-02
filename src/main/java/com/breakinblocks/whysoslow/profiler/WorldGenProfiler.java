@@ -20,6 +20,7 @@ public class WorldGenProfiler {
     private static final Logger LOGGER = LogUtils.getLogger();
 
     private static volatile boolean active = false;
+    private static volatile boolean capturing = false;
     private static volatile long profilingStartMs = 0;
     private static volatile long profilingEndMs = 0;
 
@@ -30,6 +31,7 @@ public class WorldGenProfiler {
     private static final ConcurrentHashMap<Identifier, TimingEntry> featureTimings = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Identifier, TimingEntry> structureTimings = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Identifier, TimingEntry> carverTimings = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Identifier, TimingEntry> structureStartTimings = new ConcurrentHashMap<>();
 
     private static final AtomicLong totalNoiseFillNanos = new AtomicLong();
     private static final AtomicLong totalSurfaceBuildNanos = new AtomicLong();
@@ -38,27 +40,29 @@ public class WorldGenProfiler {
     private static final AtomicLong surfaceBuildCount = new AtomicLong();
     private static final AtomicLong biomeDecorationCount = new AtomicLong();
     private static final AtomicLong totalChunksProfiled = new AtomicLong();
+    private static final AtomicLong totalBiomeFillNanos = new AtomicLong();
+    private static final AtomicLong biomeFillCount = new AtomicLong();
+
+    private static volatile ChunkPipelineProfiler.Session pipelineSession;
+    private static volatile Map<Long, ThreadCpuSample> threadCpuAtStart = Map.of();
+    private static volatile List<ThreadGroupCpu> threadCpuResult = List.of();
 
     public static boolean isActive() {
         return active;
     }
 
     public static void start(MinecraftServer server) {
+        if (capturing) endCapture();
         if (active) return;
 
         LOGGER.info("Building registry lookup maps...");
         buildRegistryMaps(server);
 
-        featureTimings.clear();
-        structureTimings.clear();
-        carverTimings.clear();
-        totalNoiseFillNanos.set(0);
-        totalSurfaceBuildNanos.set(0);
-        totalBiomeDecorationNanos.set(0);
-        noiseFillCount.set(0);
-        surfaceBuildCount.set(0);
-        biomeDecorationCount.set(0);
-        totalChunksProfiled.set(0);
+        resetTimings();
+        threadCpuResult = List.of();
+        threadCpuAtStart = snapshotThreadCpu();
+        TickProfiler.start();
+        pipelineSession = ChunkPipelineProfiler.begin("worldgen");
 
         profilingStartMs = System.currentTimeMillis();
         active = true;
@@ -66,9 +70,51 @@ public class WorldGenProfiler {
                 featureIds.size(), structureIds.size(), carverIds.size());
     }
 
+    public static boolean beginCapture(MinecraftServer server) {
+        if (active) return false;
+        buildRegistryMaps(server);
+        resetTimings();
+        capturing = true;
+        active = true;
+        return true;
+    }
+
+    public static Capture endCapture() {
+        if (!capturing) return null;
+        active = false;
+        capturing = false;
+        Capture capture = new Capture(new HashMap<>(featureTimings), new HashMap<>(structureStartTimings),
+                new HashMap<>(structureTimings), new HashMap<>(carverTimings));
+        resetTimings();
+        return capture;
+    }
+
+    private static void resetTimings() {
+        featureTimings.clear();
+        structureTimings.clear();
+        carverTimings.clear();
+        structureStartTimings.clear();
+        totalNoiseFillNanos.set(0);
+        totalSurfaceBuildNanos.set(0);
+        totalBiomeDecorationNanos.set(0);
+        noiseFillCount.set(0);
+        surfaceBuildCount.set(0);
+        biomeDecorationCount.set(0);
+        totalChunksProfiled.set(0);
+        totalBiomeFillNanos.set(0);
+        biomeFillCount.set(0);
+    }
+
+    public record Capture(Map<Identifier, TimingEntry> features, Map<Identifier, TimingEntry> structureStarts,
+                          Map<Identifier, TimingEntry> structures, Map<Identifier, TimingEntry> carvers) {
+    }
+
     public static void stop() {
         active = false;
         profilingEndMs = System.currentTimeMillis();
+        ChunkPipelineProfiler.end(pipelineSession);
+        TickProfiler.stop();
+        threadCpuResult = diffThreadCpu(threadCpuAtStart, snapshotThreadCpu());
         LOGGER.info("WorldGen profiling stopped. {} chunks profiled.", totalChunksProfiled.get());
     }
 
@@ -118,6 +164,14 @@ public class WorldGenProfiler {
         structureTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
     }
 
+    public static void recordStructureStart(net.minecraft.core.Holder<Structure> structure, long nanos) {
+        if (!active) return;
+        Identifier id = structure.unwrapKey().map(ResourceKey::identifier)
+                .orElseGet(() -> structureIds.getOrDefault(structure.value(),
+                        Identifier.fromNamespaceAndPath("unknown", "unknown_structure")));
+        structureStartTimings.computeIfAbsent(id, k -> new TimingEntry()).record(nanos);
+    }
+
     public static void recordCarver(ConfiguredWorldCarver<?> carver, long nanos) {
         if (!active) return;
         Identifier id = carverIds.getOrDefault(carver, Identifier.fromNamespaceAndPath("unknown", "unknown_carver"));
@@ -128,6 +182,52 @@ public class WorldGenProfiler {
         if (!active) return;
         totalNoiseFillNanos.addAndGet(nanos);
         noiseFillCount.incrementAndGet();
+    }
+
+    public static void recordBiomeFill(long nanos) {
+        if (!active) return;
+        totalBiomeFillNanos.addAndGet(nanos);
+        biomeFillCount.incrementAndGet();
+    }
+
+    public static long getTotalBiomeFillNanos() { return totalBiomeFillNanos.get(); }
+    public static long getBiomeFillCount() { return biomeFillCount.get(); }
+    public static ChunkPipelineProfiler.Session getPipelineSession() { return pipelineSession; }
+    public static List<ThreadGroupCpu> getThreadCpu() { return threadCpuResult; }
+
+    private static final java.lang.management.ThreadMXBean THREAD_MX = java.lang.management.ManagementFactory.getThreadMXBean();
+
+    private record ThreadCpuSample(String name, long cpuNanos) {
+    }
+
+    public record ThreadGroupCpu(String group, int threads, long cpuNanos) {
+    }
+
+    private static Map<Long, ThreadCpuSample> snapshotThreadCpu() {
+        Map<Long, ThreadCpuSample> map = new java.util.HashMap<>();
+        if (!THREAD_MX.isThreadCpuTimeSupported()) return map;
+        for (Thread thread : Thread.getAllStackTraces().keySet()) {
+            long cpu = THREAD_MX.getThreadCpuTime(thread.threadId());
+            if (cpu >= 0) map.put(thread.threadId(), new ThreadCpuSample(thread.getName(), cpu));
+        }
+        return map;
+    }
+
+    private static List<ThreadGroupCpu> diffThreadCpu(Map<Long, ThreadCpuSample> before, Map<Long, ThreadCpuSample> after) {
+        Map<String, long[]> groups = new java.util.HashMap<>();
+        after.forEach((id, sample) -> {
+            ThreadCpuSample prior = before.get(id);
+            long delta = sample.cpuNanos() - (prior != null ? prior.cpuNanos() : 0);
+            if (delta <= 0) return;
+            String group = sample.name().replaceAll("[0-9]+", "#");
+            long[] acc = groups.computeIfAbsent(group, k -> new long[2]);
+            acc[0] += delta;
+            acc[1]++;
+        });
+        List<ThreadGroupCpu> list = new java.util.ArrayList<>();
+        groups.forEach((group, acc) -> list.add(new ThreadGroupCpu(group, (int) acc[1], acc[0])));
+        list.sort((a, b) -> Long.compare(b.cpuNanos(), a.cpuNanos()));
+        return list;
     }
 
     public static void recordSurfaceBuild(long nanos) {
@@ -155,11 +255,12 @@ public class WorldGenProfiler {
 
     public static Map<Identifier, TimingEntry> getFeatureTimings() { return Collections.unmodifiableMap(featureTimings); }
     public static Map<Identifier, TimingEntry> getStructureTimings() { return Collections.unmodifiableMap(structureTimings); }
+    public static Map<Identifier, TimingEntry> getStructureStartTimings() { return Collections.unmodifiableMap(structureStartTimings); }
     public static Map<Identifier, TimingEntry> getCarverTimings() { return Collections.unmodifiableMap(carverTimings); }
 
     public static boolean hasData() {
         return totalChunksProfiled.get() > 0 || !featureTimings.isEmpty()
-                || !structureTimings.isEmpty() || !carverTimings.isEmpty();
+                || !structureTimings.isEmpty() || !carverTimings.isEmpty() || !structureStartTimings.isEmpty();
     }
 
     public static class TimingEntry {

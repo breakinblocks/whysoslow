@@ -31,8 +31,10 @@ public class WorldLoadProfiler {
         dimensionData.clear();
         modContributions.clear();
         milestones.clear();
-        lastDimensionEndNanos = 0;
-        lastDimensionMemory = 0;
+        initialSpawnNanos = 0;
+        initialSpawnDimension = null;
+        spawnSession = null;
+        spawnCapture = null;
         LOGGER.info("World load profiling started for '{}'", name);
     }
 
@@ -77,25 +79,48 @@ public class WorldLoadProfiler {
 
     public static void recordDimensionConstructed(String dimensionId) {
         if (!active) return;
-        long now = System.nanoTime();
-        long startReference;
-        synchronized (dimensionData) {
-            startReference = lastDimensionEndNanos > 0 ? lastDimensionEndNanos :
-                    (createLevelsStartNanos > 0 ? createLevelsStartNanos : worldLoadStartNanos);
-            lastDimensionEndNanos = now;
-        }
-        long memAfter = getUsedMemory();
-        DimensionLoadData data = dimensionData.computeIfAbsent(dimensionId, k -> new DimensionLoadData());
-        data.startNanos = startReference;
-        data.endNanos = now;
-        data.memoryBefore = lastDimensionMemory > 0 ? lastDimensionMemory : memoryAtStart;
-        data.memoryAfter = memAfter;
-        lastDimensionMemory = memAfter;
         addMilestone("Dimension " + dimensionId + " constructed");
     }
 
-    private static volatile long lastDimensionEndNanos = 0;
-    private static volatile long lastDimensionMemory = 0;
+    public static void recordDimensionConstruction(String dimensionId, long nanos, long memoryBefore, long memoryAfter) {
+        if (!active) return;
+        DimensionLoadData data = dimensionData.computeIfAbsent(dimensionId, k -> new DimensionLoadData());
+        long now = System.nanoTime();
+        data.startNanos = now - nanos;
+        data.endNanos = now;
+        data.memoryBefore = memoryBefore;
+        data.memoryAfter = memoryAfter;
+    }
+
+    private static volatile long initialSpawnNanos = 0;
+    private static volatile String initialSpawnDimension = null;
+    private static volatile ChunkPipelineProfiler.Session spawnSession;
+    private static volatile long initialSpawnStart = 0;
+    private static volatile WorldGenProfiler.Capture spawnCapture;
+
+    public static void onInitialSpawnStart(String dimensionId, net.minecraft.server.MinecraftServer server) {
+        if (!active) return;
+        spawnCapture = null;
+        WorldGenProfiler.beginCapture(server);
+        initialSpawnStart = System.nanoTime();
+        initialSpawnDimension = dimensionId;
+        addMilestone("Initial spawn search started in " + dimensionId);
+        spawnSession = ChunkPipelineProfiler.begin("initial spawn");
+    }
+
+    public static void onInitialSpawnEnd() {
+        if (!active || initialSpawnStart == 0) return;
+        initialSpawnNanos = System.nanoTime() - initialSpawnStart;
+        initialSpawnStart = 0;
+        ChunkPipelineProfiler.end(spawnSession);
+        spawnCapture = WorldGenProfiler.endCapture();
+        addMilestone("Initial spawn search complete");
+    }
+
+    public static long getInitialSpawnNanos() { return initialSpawnNanos; }
+    public static String getInitialSpawnDimension() { return initialSpawnDimension; }
+    public static ChunkPipelineProfiler.Session getSpawnSession() { return spawnSession; }
+    public static WorldGenProfiler.Capture getSpawnCapture() { return spawnCapture; }
 
     public static void recordModContribution(String modId, String activity, long nanos) {
         if (!active) return;

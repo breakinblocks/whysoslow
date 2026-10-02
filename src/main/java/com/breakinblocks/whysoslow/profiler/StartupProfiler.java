@@ -28,6 +28,13 @@ public class StartupProfiler {
     private static final ThreadLocal<Long> wallStart = new ThreadLocal<>();
     private static final ThreadLocal<Long> cpuStart = new ThreadLocal<>();
     private static final ThreadLocal<Long> memStart = new ThreadLocal<>();
+    private static final ThreadLocal<StackSampler.Watch> listenerWatch = new ThreadLocal<>();
+    private static final ConcurrentHashMap<Thread, StackSampler.Watch> gapWatches = new ConcurrentHashMap<>();
+    private static final List<FrameworkGap> frameworkGaps = Collections.synchronizedList(new ArrayList<>());
+
+    private static final long LISTENER_SAMPLE_THRESHOLD_MS = 250;
+    private static final long GAP_SAMPLE_THRESHOLD_MS = 500;
+    private static final long GAP_REPORT_MIN_RUNNABLE_MS = 500;
 
     public static void onModEventStart(String modId, Event event) {
         if (!active) return;
@@ -37,6 +44,10 @@ public class StartupProfiler {
             firstEventTimeMs = now;
         }
 
+        String label = modId + " / " + getPhaseFromEvent(event);
+        closeGap(Thread.currentThread(), label);
+        listenerWatch.set(StackSampler.begin(Thread.currentThread(), label, LISTENER_SAMPLE_THRESHOLD_MS));
+
         wallStart.set(System.nanoTime());
         if (THREAD_MX.isCurrentThreadCpuTimeSupported()) {
             cpuStart.set(THREAD_MX.getCurrentThreadCpuTime());
@@ -45,6 +56,8 @@ public class StartupProfiler {
     }
 
     public static void onModEventEnd(String modId, Event event) {
+        StackSampler.Profile profile = StackSampler.end(listenerWatch.get());
+        listenerWatch.remove();
         if (!active) return;
 
         lastEventTimeMs = System.currentTimeMillis();
@@ -67,10 +80,41 @@ public class StartupProfiler {
         String phase = getPhaseFromEvent(event);
         ModStartupData data = modData.computeIfAbsent(modId, k -> new ModStartupData(modId));
         data.recordPhase(phase, wallElapsed, cpuElapsed, memDelta);
+
+        if (profile != null && profile.samples() > 0) {
+            data.recordHotSpots(phase, profile);
+        }
+
+        Thread thread = Thread.currentThread();
+        if (!active) return;
+        gapWatches.put(thread, StackSampler.begin(thread, modId + " / " + phase, GAP_SAMPLE_THRESHOLD_MS));
+    }
+
+    private static void closeGap(Thread thread, String nextLabel) {
+        StackSampler.Watch watch = gapWatches.remove(thread);
+        if (watch == null) return;
+        StackSampler.Profile profile = StackSampler.end(watch);
+        if (profile == null || profile.runnableMillis() < GAP_REPORT_MIN_RUNNABLE_MS) return;
+        frameworkGaps.add(new FrameworkGap(thread.getName(), watch.label(), nextLabel, watch.elapsedNanos(), profile));
+    }
+
+    public static List<FrameworkGap> getFrameworkGaps() {
+        synchronized (frameworkGaps) {
+            List<FrameworkGap> copy = new ArrayList<>(frameworkGaps);
+            copy.sort(Comparator.comparingLong((FrameworkGap g) -> g.profile().runnableSamples()).reversed());
+            return copy;
+        }
+    }
+
+    public record FrameworkGap(String threadName, String afterLabel, String beforeLabel, long wallNanos,
+                               StackSampler.Profile profile) {
     }
 
     public static void markComplete() {
         active = false;
+        for (Thread thread : new ArrayList<>(gapWatches.keySet())) {
+            closeGap(thread, "load complete");
+        }
     }
 
     public static boolean isActive() {
@@ -154,6 +198,14 @@ public class StartupProfiler {
         public long getTotalCpuNanos() { return totalCpuNanos.get(); }
         public long getTotalMemDelta() { return totalMemDelta.get(); }
         public Map<String, PhaseData> getPhases() { return Collections.unmodifiableMap(phases); }
+
+        private final ConcurrentHashMap<String, StackSampler.Profile> hotSpots = new ConcurrentHashMap<>();
+
+        public void recordHotSpots(String phase, StackSampler.Profile profile) {
+            hotSpots.computeIfAbsent(phase, k -> new StackSampler.Profile()).merge(profile);
+        }
+
+        public Map<String, StackSampler.Profile> getHotSpots() { return Collections.unmodifiableMap(hotSpots); }
     }
 
     public static class PhaseData {
