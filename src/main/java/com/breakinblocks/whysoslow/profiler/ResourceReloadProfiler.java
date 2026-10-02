@@ -9,6 +9,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class ResourceReloadProfiler {
+    private static final long TASK_SAMPLE_THRESHOLD_MS = 100;
     private static final List<Reload> reloads = Collections.synchronizedList(new ArrayList<>());
     private static final Map<String, Atlas> atlases = new ConcurrentHashMap<>();
 
@@ -49,16 +50,17 @@ public final class ResourceReloadProfiler {
     public static final class Tracker {
         private final long startNanos = System.nanoTime();
         private final Map<String, AtomicLong[]> timings = Collections.synchronizedMap(new java.util.LinkedHashMap<>());
+        private final Map<String, StackSampler.Profile> profiles = new ConcurrentHashMap<>();
 
         private Tracker() {
         }
 
         public Executor prepareExecutor(String name, Executor executor) {
-            return timed(slot(name)[0], executor);
+            return timed(name, slot(name)[0], executor);
         }
 
         public Executor applyExecutor(String name, Executor executor) {
-            return timed(slot(name)[1], executor);
+            return timed(name, slot(name)[1], executor);
         }
 
         public void finish(boolean success) {
@@ -66,7 +68,8 @@ public final class ResourceReloadProfiler {
             try {
                 List<ListenerTiming> list = new ArrayList<>();
                 synchronized (timings) {
-                    timings.forEach((name, slot) -> list.add(new ListenerTiming(name, slot[0].get(), slot[1].get())));
+                    timings.forEach((name, slot) ->
+                            list.add(new ListenerTiming(name, slot[0].get(), slot[1].get(), profiles.get(name))));
                 }
                 recordReload(System.nanoTime() - startNanos, list);
             } catch (Throwable t) {
@@ -78,19 +81,24 @@ public final class ResourceReloadProfiler {
             return timings.computeIfAbsent(name, k -> new AtomicLong[] {new AtomicLong(), new AtomicLong()});
         }
 
-        private static Executor timed(AtomicLong accumulator, Executor executor) {
+        private Executor timed(String name, AtomicLong accumulator, Executor executor) {
             return task -> executor.execute(() -> {
                 long start = System.nanoTime();
+                StackSampler.Watch watch = StackSampler.begin(Thread.currentThread(), name, TASK_SAMPLE_THRESHOLD_MS);
                 try {
                     task.run();
                 } finally {
                     accumulator.addAndGet(System.nanoTime() - start);
+                    StackSampler.Profile profile = StackSampler.end(watch);
+                    if (profile != null && profile.samples() > 0) {
+                        profiles.computeIfAbsent(name, k -> new StackSampler.Profile()).merge(profile);
+                    }
                 }
             });
         }
     }
 
-    public record ListenerTiming(String name, long prepareNanos, long applyNanos) {
+    public record ListenerTiming(String name, long prepareNanos, long applyNanos, StackSampler.Profile profile) {
     }
 
     public record Reload(long timestampMs, long totalNanos, List<ListenerTiming> listeners) {

@@ -101,6 +101,17 @@ public final class StackSampler {
         return "(jdk/framework)";
     }
 
+    public static String modFrame(StackTraceElement[] stack) {
+        for (StackTraceElement frame : stack) {
+            String module = frame.getModuleName();
+            if (module == null) continue;
+            if (module.startsWith("java.") || module.startsWith("jdk.")) continue;
+            if (FRAMEWORK_MODULES.contains(module)) continue;
+            return frameName(frame);
+        }
+        return null;
+    }
+
     public static String frameName(StackTraceElement frame) {
         String cls = frame.getClassName();
         int dot = cls.lastIndexOf('.');
@@ -139,6 +150,7 @@ public final class StackSampler {
         private final Map<String, AtomicLong> byLeaf = new ConcurrentHashMap<>();
         private final Map<String, AtomicLong> byStack = new ConcurrentHashMap<>();
         private final Map<String, AtomicLong> byState = new ConcurrentHashMap<>();
+        private final Map<String, AtomicLong> byModFrame = new ConcurrentHashMap<>();
 
         void add(ThreadInfo info, long intervalMs) {
             StackTraceElement[] stack = info.getStackTrace();
@@ -149,6 +161,8 @@ public final class StackSampler {
             if (state == Thread.State.RUNNABLE) runnableSamples.incrementAndGet();
             byMod.computeIfAbsent(attribute(stack), k -> new AtomicLong()).incrementAndGet();
             byLeaf.computeIfAbsent(frameName(stack[0]), k -> new AtomicLong()).incrementAndGet();
+            String modFrame = modFrame(stack);
+            if (modFrame != null) byModFrame.computeIfAbsent(modFrame, k -> new AtomicLong()).incrementAndGet();
             StringBuilder key = new StringBuilder();
             for (int i = 0; i < Math.min(STACK_KEY_FRAMES, stack.length); i++) {
                 if (i > 0) key.append("\n");
@@ -164,6 +178,7 @@ public final class StackSampler {
             byLeaf.clear();
             byStack.clear();
             byState.clear();
+            byModFrame.clear();
         }
 
         public void merge(Profile other) {
@@ -174,6 +189,7 @@ public final class StackSampler {
             mergeMap(byLeaf, other.byLeaf);
             mergeMap(byStack, other.byStack);
             mergeMap(byState, other.byState);
+            mergeMap(byModFrame, other.byModFrame);
         }
 
         private static void mergeMap(Map<String, AtomicLong> into, Map<String, AtomicLong> from) {
@@ -210,6 +226,10 @@ public final class StackSampler {
 
         public List<Map.Entry<String, Long>> topStacks(int limit) {
             return top(byStack, limit);
+        }
+
+        public List<Map.Entry<String, Long>> topModFrames(int limit) {
+            return top(byModFrame, limit);
         }
 
         public List<Map.Entry<String, Long>> states() {

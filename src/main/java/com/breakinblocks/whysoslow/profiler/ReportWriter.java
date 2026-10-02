@@ -402,11 +402,8 @@ public class ReportWriter {
                     w.println();
                     w.printf("  %s lost mipmaps (%d -> %d). Textures that limit it:%n", atlas.name(),
                             atlas.requestedMip(), atlas.mipLevel());
-                    atlas.limiters().stream().limit(60).forEach(l ->
+                    atlas.limiters().forEach(l ->
                             w.printf("    %-70s %4dx%-4d  allows mip %d%n", l.sprite(), l.width(), l.height(), l.limitedTo()));
-                    if (atlas.limiters().size() > 60) {
-                        w.printf("    ... and %d more%n", atlas.limiters().size() - 60);
-                    }
                 }
             }
 
@@ -421,6 +418,19 @@ public class ReportWriter {
                 reload.listeners().stream().limit(30).forEach(l ->
                         w.printf("  %-60s prepare %10s  |  apply %10s%n", trim(l.name(), 60),
                                 formatNanos(l.prepareNanos()), formatNanos(l.applyNanos())));
+                List<ResourceReloadProfiler.ListenerTiming> sampled = reload.listeners().stream()
+                        .filter(l -> l.profile() != null && l.profile().samples() > 0)
+                        .limit(8)
+                        .toList();
+                if (!sampled.isEmpty()) {
+                    w.println();
+                    w.println("  Where the slowest listeners spent their time (tasks over 100ms, sampled):");
+                    for (ResourceReloadProfiler.ListenerTiming l : sampled) {
+                        w.println();
+                        w.printf("  %s (%s sampled)%n", l.name(), formatMs(l.profile().sampledMillis()));
+                        writeProfile(w, l.profile(), "    ", 2);
+                    }
+                }
             }
 
             w.println();
@@ -502,6 +512,12 @@ public class ReportWriter {
         w.printf("%shot methods:%n", indent);
         profile.topLeaves(5).forEach(e ->
                 w.printf("%s  %5.1f%%  %s%n", indent, e.getValue() * 100.0 / total, e.getKey()));
+        List<Map.Entry<String, Long>> modFrames = profile.topModFrames(5);
+        if (!modFrames.isEmpty()) {
+            w.printf("%sinnermost mod methods:%n", indent);
+            modFrames.forEach(e ->
+                    w.printf("%s  %5.1f%%  %s%n", indent, e.getValue() * 100.0 / total, e.getKey()));
+        }
         int rank = 0;
         for (Map.Entry<String, Long> stack : profile.topStacks(stacks)) {
             rank++;
